@@ -13,7 +13,6 @@ using std::vector;
  */
 FusionEKF::FusionEKF() {
   is_initialized_ = false;
-  previous_timestamp_ = 0;
 
   // initializing matrices
   R_laser_ = MatrixXd(2, 2);
@@ -54,15 +53,14 @@ FusionEKF::FusionEKF() {
   ekf_.P_ = MatrixXd(4, 4);
   ekf_.P_ << 1, 0, 0, 0,
              0, 1, 0, 0,
-             0, 0, 1, 0,
-             0, 0, 0, 1;
+             0, 0, 1000, 0,
+             0, 0, 0, 1000;
 
   ekf_.Q_ = MatrixXd(4, 4);
   ekf_.Q_ << 1, 0, 1, 0,
              0, 1, 0, 1,
              1, 0, 1, 0,
              0, 1, 0, 1;
-
 }
 
 /**
@@ -84,6 +82,8 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
       * Remember: you'll need to convert radar from polar to cartesian coordinates.
     */
 
+    previous_timestamp_ = measurement_pack.timestamp_;
+
     // first measurement
     cout << "EKF: " << endl;
     ekf_.x_ = VectorXd(4);
@@ -93,9 +93,9 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
       /**
       Convert radar from polar to cartesian coordinates and initialize state.
       */
-      float rho = measurement_pack.raw_measurements_(2);
-      float phi = measurement_pack.raw_measurements_(3);
-      float rho_dot = measurement_pack.raw_measurements_(4);
+      float rho = measurement_pack.raw_measurements_(0);
+      float phi = measurement_pack.raw_measurements_(1);
+      float rho_dot = measurement_pack.raw_measurements_(2);
 
       ekf_.x_(0) = rho * cos(phi);
       ekf_.x_(1) = rho * sin(phi);
@@ -109,8 +109,6 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
       ekf_.x_(0) = measurement_pack.raw_measurements_(0);
       ekf_.x_(1) = measurement_pack.raw_measurements_(1);
     }
-
-    float previous_timestamp_ = measurement_pack.timestamp_;
 
     // done initializing, no need to predict or update
     is_initialized_ = true;
@@ -168,13 +166,13 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
     Tools tools;
     Hj_ = tools.CalculateJacobian(ekf_.x_);
     ekf_.H_ = Hj_;
-    ekf_.R_ = R_laser_;
+    ekf_.R_ = R_radar_;
     ekf_.UpdateEKF(measurement_pack.raw_measurements_);
   } else {
     // Laser updates
     ekf_.H_ = H_laser_;
     ekf_.R_ = R_laser_;
-    ekf_.UpdateEKF(measurement_pack.raw_measurements_);
+    ekf_.Update(measurement_pack.raw_measurements_);
   }
 
   // print the output
